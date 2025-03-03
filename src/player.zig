@@ -38,7 +38,7 @@ pub const Player = struct {
     const MOVE_SPEED = 200.0;
     const JUMP_FORCE = -400.0;
     const GRAVITY = 800.0;
-    const FRAME_SPEED = 15; // 增加帧间隔，让动画更慢
+    const FRAME_SPEED = 30;
 
     pub fn init() !Player {
         const charactersDir = "./assets/kenney_simplified-platformer-pack/PNG/Characters";
