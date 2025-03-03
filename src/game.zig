@@ -9,8 +9,8 @@ pub const Game = struct {
     camera: rl.Camera2D,
     platforms: [11]Platform,
 
-    pub fn init(win_width: i32, win_height: i32) Game {
-        const player = Player.init();
+    pub fn init(win_width: i32, win_height: i32) !Game {
+        const player = try Player.init();
         const camera = rl.Camera2D{
             .offset = .{ .x = @as(f32, @floatFromInt(win_width)) / 2.0, .y = @as(f32, @floatFromInt(win_height)) / 2.0 },
             .target = .{ .x = player.position.x, .y = player.position.y },

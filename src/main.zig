@@ -4,14 +4,17 @@ const Game = @import("game.zig").Game;
 
 pub fn main() !void {
     // Initialization
-    const win_width = 800;
-    const win_height = 450;
+    const winWidth = 800;
+    const winHeight = 450;
 
-    rl.initWindow(win_width, win_height, "Platformer");
+    rl.initWindow(winWidth, winHeight, "Platformer");
     defer rl.closeWindow();
     rl.setTargetFPS(60);
 
-    var game = Game.init(win_width, win_height);
+    var game = Game.init(winWidth, winHeight) catch {
+        std.log.err("Failed to initialize game", .{});
+        return;
+    };
 
     // Main game loop
     while (!rl.windowShouldClose()) {
