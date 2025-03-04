@@ -15,6 +15,7 @@ pub fn main() !void {
         std.log.err("Failed to initialize game", .{});
         return;
     };
+    defer game.deinit();
 
     // Main game loop
     while (!rl.windowShouldClose()) {

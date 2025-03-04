@@ -19,15 +19,20 @@ pub const Player = struct {
     isJumping: bool,
     state: PlayerState,
 
-    // Textures for various actions
-    texture_idle: rl.Texture2D,
-    texture_walk1: rl.Texture2D,
-    texture_walk2: rl.Texture2D,
-    texture_jump: rl.Texture2D,
-    texture_duck: rl.Texture2D,
-    texture_climb1: rl.Texture2D,
-    texture_climb2: rl.Texture2D,
-    texture_happy: rl.Texture2D,
+    // Single texture for all states
+    texture: rl.Texture2D,
+
+    // Frame rectangles for each state
+    frames: struct {
+        idle: rl.Rectangle,
+        walk1: rl.Rectangle,
+        walk2: rl.Rectangle,
+        jump: rl.Rectangle,
+        duck: rl.Rectangle,
+        climb1: rl.Rectangle,
+        climb2: rl.Rectangle,
+        happy: rl.Rectangle,
+    },
 
     // For walk animation timing
     framesCounter: i32,
@@ -40,47 +45,37 @@ pub const Player = struct {
     const GRAVITY = 800.0;
     const FRAME_SPEED = 30;
 
+    // Character frame size in the tilesheet
+    const FRAME_WIDTH = 96;
+    const FRAME_HEIGHT = 96;
+
     pub fn init() !Player {
-        const charactersDir = "./assets/kenney_simplified-platformer-pack/PNG/Characters";
-        // Load textures from assets
-        const tex_idle = try rl.loadTexture(charactersDir ++ "/platformChar_idle.png");
-        const tex_walk1 = try rl.loadTexture(charactersDir ++ "/platformChar_walk1.png");
-        const tex_walk2 = try rl.loadTexture(charactersDir ++ "/platformChar_walk2.png");
-        const tex_jump = try rl.loadTexture(charactersDir ++ "/platformChar_jump.png");
-        const tex_duck = try rl.loadTexture(charactersDir ++ "/platformChar_duck.png");
-        const tex_climb1 = try rl.loadTexture(charactersDir ++ "/platformChar_climb1.png");
-        const tex_climb2 = try rl.loadTexture(charactersDir ++ "/platformChar_climb2.png");
-        const tex_happy = try rl.loadTexture(charactersDir ++ "/platformChar_happy.png");
+        // Load the tilesheet
+        const texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformerPack_character.png");
+
+        // Define frame rectangles for each state
+        const frames = .{
+            .idle = rl.Rectangle{ .x = 0, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .jump = rl.Rectangle{ .x = FRAME_WIDTH, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .walk1 = rl.Rectangle{ .x = FRAME_WIDTH * 2, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .walk2 = rl.Rectangle{ .x = FRAME_WIDTH * 3, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .climb1 = rl.Rectangle{ .x = FRAME_WIDTH * 4, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .climb2 = rl.Rectangle{ .x = FRAME_WIDTH * 5, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .duck = rl.Rectangle{ .x = FRAME_WIDTH * 6, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+            .happy = rl.Rectangle{ .x = FRAME_WIDTH * 7, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
+        };
 
         return Player{
             .position = .{ .x = 100, .y = 300 },
             .velocity = .{ .x = 0, .y = 0 },
-            // Adjust size if needed; here we assume 32x32
-            .size = .{ .x = 32, .y = 32 },
+            .size = .{ .x = 48, .y = 48 }, // Display size
             .isJumping = false,
             .state = PlayerState.Idle,
-            .texture_idle = tex_idle,
-            .texture_walk1 = tex_walk1,
-            .texture_walk2 = tex_walk2,
-            .texture_jump = tex_jump,
-            .texture_duck = tex_duck,
-            .texture_climb1 = tex_climb1,
-            .texture_climb2 = tex_climb2,
-            .texture_happy = tex_happy,
+            .texture = texture,
+            .frames = frames,
             .framesCounter = 0,
             .isFlipped = false,
         };
-    }
-
-    pub fn deinit(self: *Player) void {
-        rl.unloadTexture(self.texture_idle);
-        rl.unloadTexture(self.texture_walk1);
-        rl.unloadTexture(self.texture_walk2);
-        rl.unloadTexture(self.texture_jump);
-        rl.unloadTexture(self.texture_duck);
-        rl.unloadTexture(self.texture_climb1);
-        rl.unloadTexture(self.texture_climb2);
-        rl.unloadTexture(self.texture_happy);
     }
 
     pub fn update(self: *Player, dt: f32, platforms: []const Platform) void {
@@ -155,47 +150,44 @@ pub const Player = struct {
     }
 
     pub fn draw(self: Player) void {
-        var tex: rl.Texture2D = self.texture_idle; // default
+        var sourceRect = self.frames.idle;
 
-        // Select texture based on state
+        // Select source rectangle based on state
         switch (self.state) {
             PlayerState.Idle => {
-                tex = self.texture_idle;
+                sourceRect = self.frames.idle;
             },
             PlayerState.Walk => {
                 // Alternate between walk textures
                 if (@rem(self.framesCounter, 2) == 0) {
-                    tex = self.texture_walk1;
+                    sourceRect = self.frames.walk1;
                 } else {
-                    tex = self.texture_walk2;
+                    sourceRect = self.frames.walk2;
                 }
             },
             PlayerState.Jump => {
-                tex = self.texture_jump;
+                sourceRect = self.frames.jump;
             },
             PlayerState.Duck => {
-                tex = self.texture_duck;
+                sourceRect = self.frames.duck;
             },
             PlayerState.Climb => {
                 // For climb we can alternate between two climb textures
                 if (@rem(self.framesCounter, 2) == 0) {
-                    tex = self.texture_climb1;
+                    sourceRect = self.frames.climb1;
                 } else {
-                    tex = self.texture_climb2;
+                    sourceRect = self.frames.climb2;
                 }
             },
             PlayerState.Happy => {
-                tex = self.texture_happy;
+                sourceRect = self.frames.happy;
             },
         }
 
-        // Source rectangle (entire texture)
-        const source = rl.Rectangle{
-            .x = 0,
-            .y = 0,
-            .width = if (self.isFlipped) -@as(f32, @floatFromInt(tex.width)) else @as(f32, @floatFromInt(tex.width)),
-            .height = @as(f32, @floatFromInt(tex.height)),
-        };
+        // Apply flip if needed
+        if (self.isFlipped) {
+            sourceRect.width = -sourceRect.width;
+        }
 
         // Destination rectangle (where to draw on screen)
         const dest = rl.Rectangle{
@@ -209,6 +201,10 @@ pub const Player = struct {
         const origin = rl.Vector2{ .x = 0, .y = 0 };
 
         // Draw the texture
-        rl.drawTexturePro(tex, source, dest, origin, 0.0, rl.Color.white);
+        rl.drawTexturePro(self.texture, sourceRect, dest, origin, 0.0, rl.Color.white);
+    }
+
+    pub fn deinit(self: *Player) void {
+        rl.unloadTexture(self.texture);
     }
 };

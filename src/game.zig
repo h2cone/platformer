@@ -52,4 +52,8 @@ pub const Game = struct {
 
         rl.endMode2D();
     }
+
+    pub fn deinit(self: *Game) void {
+        self.player.deinit();
+    }
 };
