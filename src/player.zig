@@ -56,7 +56,8 @@ pub const Player = struct {
         return Player{
             .position = .{ .x = 100, .y = 300 },
             .velocity = .{ .x = 0, .y = 0 },
-            .size = .{ .x = 48, .y = 48 }, // Display size
+             // Display size
+            .size = .{ .x = 48, .y = 48 },
             .isJumping = false,
             .state = PlayerState.Idle,
             .texture = texture,

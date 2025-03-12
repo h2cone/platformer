@@ -1,4 +1,7 @@
 const rl = @import("raylib");
+const cute_tiled = @cImport({
+    @cInclude("cute_tiled.h");
+});
 
 pub const Platform = struct {
     position: rl.Vector2,

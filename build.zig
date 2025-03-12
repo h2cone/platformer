@@ -125,4 +125,14 @@ pub fn build(b: *std.Build) void {
     exe.linkLibrary(raylib_artifact);
     exe.root_module.addImport("raylib", raylib);
     exe.root_module.addImport("raygui", raygui);
+
+    // C source and header files
+    exe.addCSourceFile(.{ .file = .{ .src_path = .{
+        .owner = b,
+        .sub_path = "lib/cute_tiled_impl.c",
+    } } });
+    exe.addIncludePath(.{ .src_path = .{
+        .owner = b,
+        .sub_path = "lib",
+    } });
 }
