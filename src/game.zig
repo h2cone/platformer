@@ -7,11 +7,21 @@ const Platform = platform_mod.Platform;
 pub const Game = struct {
     player: Player,
     camera: rl.Camera2D,
-    platforms: [11]Platform,
+    platforms: []Platform,
+    allocator: std.mem.Allocator,
 
-    pub fn init(win_width: i32, win_height: i32) !Game {
-        const player = try Player.init();
+    pub fn init(allocator: std.mem.Allocator, win_width: i32, win_height: i32) !Game {
+        // Load platforms first
         try Platform.init();
+        const platforms = try platform_mod.loadPlatformsFromTiled(allocator, "./assets/land.tmj");
+
+        // Calculate initial player position based on the first platform
+        const initial_player_pos = rl.Vector2{
+            .x = platforms[0].position.x + 48.0, // A bit offset from the left edge
+            .y = platforms[0].position.y - 48.0, // Place on top of the platform
+        };
+
+        const player = try Player.init(initial_player_pos);
 
         const camera = rl.Camera2D{
             .offset = .{ .x = @as(f32, @floatFromInt(win_width)) / 2.0, .y = @as(f32, @floatFromInt(win_height)) / 2.0 },
@@ -23,13 +33,14 @@ pub const Game = struct {
         return Game{
             .player = player,
             .camera = camera,
-            .platforms = platform_mod.createPlatforms(),
+            .platforms = platforms,
+            .allocator = allocator,
         };
     }
 
     pub fn update(self: *Game) void {
         const dt = rl.getFrameTime();
-        self.player.update(dt, &self.platforms);
+        self.player.update(dt, self.platforms);
 
         // Update camera position to follow player
         self.camera.target = .{
@@ -58,5 +69,6 @@ pub const Game = struct {
     pub fn deinit(self: *Game) void {
         self.player.deinit();
         Platform.deinit(); // Cleanup platform texture
+        self.allocator.free(self.platforms); // Free the platform array memory
     }
 };

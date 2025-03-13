@@ -49,14 +49,14 @@ pub const Player = struct {
     const FRAME_WIDTH = 96;
     const FRAME_HEIGHT = 96;
 
-    pub fn init() !Player {
+    pub fn init(initial_position: rl.Vector2) !Player {
         // Load the tilesheet
         const texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformerPack_character.png");
 
         return Player{
-            .position = .{ .x = 100, .y = 300 },
+            .position = initial_position,
             .velocity = .{ .x = 0, .y = 0 },
-             // Display size
+            // Display size
             .size = .{ .x = 48, .y = 48 },
             .isJumping = false,
             .state = PlayerState.Idle,

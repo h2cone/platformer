@@ -3,21 +3,28 @@ const rl = @import("raylib");
 const Game = @import("game.zig").Game;
 
 pub fn main() !void {
-    // Initialization
+    // Initialize window
     const winWidth = 800;
     const winHeight = 450;
-
     rl.initWindow(winWidth, winHeight, "Platformer");
     defer rl.closeWindow();
+
+    // Set target FPS
     rl.setTargetFPS(60);
 
-    var game = Game.init(winWidth, winHeight) catch {
-        std.log.err("Failed to initialize game", .{});
+    // Create a general purpose allocator
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Initialize game
+    var game = Game.init(allocator, winWidth, winHeight) catch {
+        std.debug.print("Failed to initialize game\n", .{});
         return;
     };
     defer game.deinit();
 
-    // Main game loop
+    // Game loop
     while (!rl.windowShouldClose()) {
         game.update();
 
