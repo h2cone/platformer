@@ -22,7 +22,7 @@
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
          "height":20,
          "id":1,
          "name":"Tile Layer 1",
@@ -38,12 +38,12 @@
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.11.2",
- "tileheight":32,
+ "tileheight":64,
  "tilesets":[
         {
          "columns":14,
          "firstgid":1,
-         "image":"kenney_simplified-platformer-pack\/Tilesheet\/platformPack_tilesheet.png",
+         "image":"..\/..\/..\/projc\/platformer\/assets\/kenney_simplified-platformer-pack\/Tilesheet\/platformPack_tilesheet.png",
          "imageheight":448,
          "imagewidth":896,
          "margin":0,
@@ -53,7 +53,7 @@
          "tileheight":64,
          "tilewidth":64
         }],
- "tilewidth":32,
+ "tilewidth":64,
  "type":"map",
  "version":"1.10",
  "width":30

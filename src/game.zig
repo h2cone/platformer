@@ -8,23 +8,25 @@ pub const Game = struct {
     player: Player,
     camera: rl.Camera2D,
     platforms: []Platform,
-    allocator: std.mem.Allocator,
+    alloc: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator, win_width: i32, win_height: i32) !Game {
+    pub fn init(width: i32, height: i32, alloc: std.mem.Allocator) !Game {
         // Load platforms first
         try Platform.init();
-        const platforms = try platform_mod.loadPlatformsFromTiled(allocator, "./assets/land.tmj");
+        const platforms = try platform_mod.buildPlatforms("./assets/land.tmj", alloc);
 
         // Calculate initial player position based on the first platform
-        const initial_player_pos = rl.Vector2{
-            .x = platforms[0].position.x + 48.0, // A bit offset from the left edge
-            .y = platforms[0].position.y - 48.0, // Place on top of the platform
+        const init_player_pos = rl.Vector2{
+            // A bit offset from the left edge
+            .x = platforms[0].position.x + 48.0,
+            // Place on top of the platform
+            .y = platforms[0].position.y - 48.0,
         };
 
-        const player = try Player.init(initial_player_pos);
+        const player = try Player.init(init_player_pos);
 
         const camera = rl.Camera2D{
-            .offset = .{ .x = @as(f32, @floatFromInt(win_width)) / 2.0, .y = @as(f32, @floatFromInt(win_height)) / 2.0 },
+            .offset = .{ .x = @as(f32, @floatFromInt(width)) / 2.0, .y = @as(f32, @floatFromInt(height)) / 2.0 },
             .target = .{ .x = player.position.x, .y = player.position.y },
             .rotation = 0.0,
             .zoom = 1.0,
@@ -34,7 +36,7 @@ pub const Game = struct {
             .player = player,
             .camera = camera,
             .platforms = platforms,
-            .allocator = allocator,
+            .alloc = alloc,
         };
     }
 
@@ -68,7 +70,9 @@ pub const Game = struct {
 
     pub fn deinit(self: *Game) void {
         self.player.deinit();
-        Platform.deinit(); // Cleanup platform texture
-        self.allocator.free(self.platforms); // Free the platform array memory
+        // Cleanup platform texture
+        Platform.deinit();
+        // Free the platform array memory
+        self.alloc.free(self.platforms);
     }
 };

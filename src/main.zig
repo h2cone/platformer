@@ -4,9 +4,9 @@ const Game = @import("game.zig").Game;
 
 pub fn main() !void {
     // Initialize window
-    const winWidth = 800;
-    const winHeight = 450;
-    rl.initWindow(winWidth, winHeight, "Platformer");
+    const width = 800;
+    const height = 450;
+    rl.initWindow(width, height, "Platformer");
     defer rl.closeWindow();
 
     // Set target FPS
@@ -15,10 +15,10 @@ pub fn main() !void {
     // Create a general purpose allocator
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    const alloc = gpa.allocator();
 
     // Initialize game
-    var game = Game.init(allocator, winWidth, winHeight) catch {
+    var game = Game.init(width, height, alloc) catch {
         std.debug.print("Failed to initialize game\n", .{});
         return;
     };
