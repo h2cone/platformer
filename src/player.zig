@@ -41,7 +41,7 @@ pub const Player = struct {
     isFlipped: bool,
 
     const MOVE_SPEED = 200.0;
-    const JUMP_FORCE = -400.0;
+    const JUMP_FORCE = -500.0;
     const GRAVITY = 800.0;
     const FRAME_SPEED = 30;
 
@@ -107,23 +107,49 @@ pub const Player = struct {
         // Apply gravity
         self.velocity.y += GRAVITY * dt;
 
-        // Update position
-        self.position.x += self.velocity.x * dt;
-        self.position.y += self.velocity.y * dt;
+        // Save the current position for more precise collision detection
+        const oldPosition = self.position;
 
-        // Collision detection with platforms
+        // Update horizontal position first
+        self.position.x += self.velocity.x * dt;
+
+        // Detect horizontal collisions
         for (platforms) |platform| {
             if (self.checkCollision(platform)) {
-                if (self.velocity.y > 0) {
+                // Use oldPosition to determine collision direction
+                if (oldPosition.x + self.size.x <= platform.position.x) {
+                    // Collision from the left
+                    self.position.x = platform.position.x - self.size.x;
+                } else if (oldPosition.x >= platform.position.x + platform.size.x) {
+                    // Collision from the right
+                    self.position.x = platform.position.x + platform.size.x;
+                }
+                self.velocity.x = 0;
+            }
+        }
+
+        // Update vertical position
+        self.position.y += self.velocity.y * dt;
+
+        // Detect vertical collisions
+        for (platforms) |platform| {
+            if (self.checkCollision(platform)) {
+                // Use oldPosition to determine collision direction
+                if (oldPosition.y + self.size.y <= platform.position.y) {
+                    // Collision from above
                     self.position.y = platform.position.y - self.size.y;
                     self.velocity.y = 0;
                     self.isJumping = false;
-                    // Reset state to Idle if no horizontal input
+                    // Reset state
                     if (self.velocity.x == 0) {
                         self.state = PlayerState.Idle;
                     } else {
                         self.state = PlayerState.Walk;
                     }
+                } else if (oldPosition.y >= platform.position.y + platform.size.y) {
+                    // Collision from below
+                    self.position.y = platform.position.y + platform.size.y;
+                    self.velocity.y = 0;
                 }
             }
         }

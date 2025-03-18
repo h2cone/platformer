@@ -15,12 +15,30 @@ pub const Game = struct {
         try Platform.init();
         const platforms = try platform_mod.buildPlatforms("./assets/land.tmj", alloc);
 
-        // Calculate initial player position based on the first platform
+        // Find the platform in the bottom-left corner
+        var bottom_left_platform_index: usize = 0;
+
+        for (platforms, 0..) |platform, i| {
+            // Check if this platform is more to the left or more to the bottom
+            if (platform.position.x <= platforms[bottom_left_platform_index].position.x and
+                platform.position.y >= platforms[bottom_left_platform_index].position.y)
+            {
+                bottom_left_platform_index = i;
+            } else if (platform.position.x < platforms[bottom_left_platform_index].position.x) {
+                // Prioritize leftmost position
+                bottom_left_platform_index = i;
+            } else if (platform.position.y > platforms[bottom_left_platform_index].position.y) {
+                // If x is the same, choose the one with larger y (lower on screen)
+                bottom_left_platform_index = i;
+            }
+        }
+
+        // Calculate initial player position based on the bottom-left platform
         const init_player_pos = rl.Vector2{
             // A bit offset from the left edge
-            .x = platforms[0].position.x + 48.0,
+            .x = platforms[bottom_left_platform_index].position.x + 48.0,
             // Place on top of the platform
-            .y = platforms[0].position.y - 48.0,
+            .y = platforms[bottom_left_platform_index].position.y - 64.0, // Use player height
         };
 
         const player = try Player.init(init_player_pos);
