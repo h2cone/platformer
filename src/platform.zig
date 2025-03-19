@@ -7,12 +7,12 @@ const std = @import("std");
 pub const Platform = struct {
     position: rl.Vector2,
     size: rl.Vector2,
+    imageRect: rl.Rectangle,
 
     // Shared texture and frame definitions
     var texture: rl.Texture2D = undefined;
     // Size of each tile in the tilesheet
     const TILE_SIZE = 64;
-    const TILE_RECT = rl.Rectangle{ .x = 0, .y = 0, .width = TILE_SIZE, .height = TILE_SIZE };
 
     pub fn init() !void {
         Platform.texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformPack_tilesheet.png");
@@ -23,7 +23,7 @@ pub const Platform = struct {
     }
 
     pub fn draw(self: Platform) void {
-        rl.drawTextureRec(Platform.texture, TILE_RECT, self.position, rl.Color.white);
+        rl.drawTextureRec(Platform.texture, self.imageRect, self.position, rl.Color.white);
     }
 };
 
@@ -97,11 +97,12 @@ pub fn buildPlatforms(map_path: []const u8, alloc: std.mem.Allocator) ![]Platfor
             for (0..height) |row| {
                 for (0..width) |col| {
                     // Convert two-dimensional coordinates to a one-dimensional array index
-                    const tileIndex = row * width + col;
-                    if (data[tileIndex] > 0) {
+                    const dataIndex = row * width + col;
+                    const dataItem = data[dataIndex];
+                    if (dataItem > 0) {
+                        const tileId: u32 = @intCast(dataItem - 1);
                         // Create a platform for this tile
                         platforms[platformIndex] = Platform{
-                            // Convert grid coordinates to pixel coordinates
                             .position = rl.Vector2{
                                 .x = @as(f32, @floatFromInt(col)) * Platform.TILE_SIZE,
                                 .y = @as(f32, @floatFromInt(row)) * Platform.TILE_SIZE,
@@ -109,6 +110,12 @@ pub fn buildPlatforms(map_path: []const u8, alloc: std.mem.Allocator) ![]Platfor
                             .size = rl.Vector2{
                                 .x = @floatFromInt(Platform.TILE_SIZE),
                                 .y = @floatFromInt(Platform.TILE_SIZE),
+                            },
+                            .imageRect = rl.Rectangle{
+                                .x = @floatFromInt((tileId % width) * Platform.TILE_SIZE),
+                                .y = @floatFromInt((tileId / width) * Platform.TILE_SIZE),
+                                .width = Platform.TILE_SIZE,
+                                .height = Platform.TILE_SIZE,
                             },
                         };
                         platformIndex += 1;
