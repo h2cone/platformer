@@ -11,11 +11,14 @@ pub const Platform = struct {
 
     // Shared texture and frame definitions
     var texture: rl.Texture2D = undefined;
+    var tilesPerRow: usize = undefined;
     // Size of each tile in the tilesheet
-    const TILE_SIZE = 64;
+    pub const TILE_SIZE = 64;
 
     pub fn init() !void {
         Platform.texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformPack_tilesheet.png");
+        const textureWidth: u32 = @intCast(Platform.texture.width);
+        Platform.tilesPerRow = @divExact(textureWidth, Platform.TILE_SIZE);
     }
 
     pub fn deinit() void {
@@ -112,8 +115,8 @@ pub fn buildPlatforms(map_path: []const u8, alloc: std.mem.Allocator) ![]Platfor
                                 .y = @floatFromInt(Platform.TILE_SIZE),
                             },
                             .imageRect = rl.Rectangle{
-                                .x = @floatFromInt((tileId % width) * Platform.TILE_SIZE),
-                                .y = @floatFromInt((tileId / width) * Platform.TILE_SIZE),
+                                .x = @floatFromInt((tileId % Platform.tilesPerRow) * Platform.TILE_SIZE),
+                                .y = @floatFromInt((tileId / Platform.tilesPerRow) * Platform.TILE_SIZE),
                                 .width = Platform.TILE_SIZE,
                                 .height = Platform.TILE_SIZE,
                             },

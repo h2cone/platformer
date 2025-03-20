@@ -15,30 +15,34 @@ pub const Game = struct {
         try Platform.init();
         const platforms = try platform_mod.buildPlatforms("./assets/land.tmj", alloc);
 
-        // Find the platform in the bottom-left corner
-        var bottom_left_platform_index: usize = 0;
+        // 寻找合适的起始位置 - 找到地面平台而非墙壁
+        var start_platform_index: usize = 0;
 
-        for (platforms, 0..) |platform, i| {
-            // Check if this platform is more to the left or more to the bottom
-            if (platform.position.x <= platforms[bottom_left_platform_index].position.x and
-                platform.position.y >= platforms[bottom_left_platform_index].position.y)
-            {
-                bottom_left_platform_index = i;
-            } else if (platform.position.x < platforms[bottom_left_platform_index].position.x) {
-                // Prioritize leftmost position
-                bottom_left_platform_index = i;
-            } else if (platform.position.y > platforms[bottom_left_platform_index].position.y) {
-                // If x is the same, choose the one with larger y (lower on screen)
-                bottom_left_platform_index = i;
+        // 首先，找到所有最底部的平台
+        var bottom_y: f32 = 0;
+        for (platforms) |platform| {
+            if (platform.position.y > bottom_y) {
+                bottom_y = platform.position.y;
             }
         }
 
-        // Calculate initial player position based on the bottom-left platform
+        // 在底部平台中找一个不是在最左边的平台(避开墙壁)
+        for (platforms, 0..) |platform, i| {
+            if (platform.position.y == bottom_y) {
+                // 选择一个不在最左边的平台(假设第一列是墙壁)
+                if (platform.position.x >= Platform.TILE_SIZE) {
+                    start_platform_index = i;
+                    break;
+                }
+            }
+        }
+
+        // 计算玩家初始位置 - 放在找到的平台上方中央
         const init_player_pos = rl.Vector2{
-            // A bit offset from the left edge
-            .x = platforms[bottom_left_platform_index].position.x + 48.0,
-            // Place on top of the platform
-            .y = platforms[bottom_left_platform_index].position.y - 64.0, // Use player height
+            // 放在平台中间，而不是边缘
+            .x = platforms[start_platform_index].position.x + (Platform.TILE_SIZE / 2) - 24.0,
+            // 确保玩家站在平台上方
+            .y = platforms[start_platform_index].position.y - 48.0,
         };
 
         const player = try Player.init(init_player_pos);
