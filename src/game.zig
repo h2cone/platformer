@@ -15,10 +15,10 @@ pub const Game = struct {
         try Platform.init();
         const platforms = try platform_mod.buildPlatforms("./assets/land.tmj", alloc);
 
-        // 寻找合适的起始位置 - 找到地面平台而非墙壁
+        // Find a suitable starting position - find a ground platform instead of a wall
         var start_platform_index: usize = 0;
 
-        // 首先，找到所有最底部的平台
+        // First, find all platforms at the bottom
         var bottom_y: f32 = 0;
         for (platforms) |platform| {
             if (platform.position.y > bottom_y) {
@@ -26,10 +26,10 @@ pub const Game = struct {
             }
         }
 
-        // 在底部平台中找一个不是在最左边的平台(避开墙壁)
+        // Among the bottom platforms, find one that's not at the leftmost edge (avoid walls)
         for (platforms, 0..) |platform, i| {
             if (platform.position.y == bottom_y) {
-                // 选择一个不在最左边的平台(假设第一列是墙壁)
+                // Choose a platform not at the leftmost edge (assuming first column is wall)
                 if (platform.position.x >= Platform.TILE_SIZE) {
                     start_platform_index = i;
                     break;
@@ -37,11 +37,11 @@ pub const Game = struct {
             }
         }
 
-        // 计算玩家初始位置 - 放在找到的平台上方中央
+        // Calculate initial player position - place above the center of the found platform
+        // Place in the middle of the platform, not at the edge
         const init_player_pos = rl.Vector2{
-            // 放在平台中间，而不是边缘
             .x = platforms[start_platform_index].position.x + (Platform.TILE_SIZE / 2) - 24.0,
-            // 确保玩家站在平台上方
+            // Ensure player stands on top of the platform
             .y = platforms[start_platform_index].position.y - 48.0,
         };
 

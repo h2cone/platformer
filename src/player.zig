@@ -20,10 +20,12 @@ pub const Player = struct {
     isJumping: bool,
     state: PlayerState,
 
-    // 新增墙壁滑行相关属性
+    // Wall sliding related properties
     isWallSliding: bool,
-    wallDirection: f32, // -1.0 表示左墙, 1.0 表示右墙
-    wallSlideTimer: f32, // 墙壁吸附时间计时器
+    // Wall direction, -1.0 for left wall, 1.0 for right wall
+    wallDirection: f32,
+    // Wall slide timer
+    wallSlideTimer: f32,
 
     // Single texture for all states
     texture: rl.Texture2D,
@@ -51,11 +53,14 @@ pub const Player = struct {
     const GRAVITY = 800.0;
     const FRAME_SPEED = 30;
 
-    // 墙壁滑行和蹬墙跳相关常量
-    const WALL_SLIDE_GRAVITY = 200.0; // 墙壁滑行时的重力（比正常重力小）
-    const WALL_SLIDE_MAX_TIME = 1.2; // 墙壁最大吸附时间（秒）
-    const WALL_JUMP_HORIZONTAL_FORCE = 300.0; // 蹬墙跳的水平推力
-    const WALL_JUMP_VERTICAL_FORCE = -450.0; // 蹬墙跳的垂直推力
+    // Gravity when wall sliding (less than normal gravity)
+    const WALL_SLIDE_GRAVITY = 200.0;
+    // Maximum wall slide time (in seconds)
+    const WALL_SLIDE_MAX_TIME = 1.2;
+    // Horizontal force for wall jump
+    const WALL_JUMP_HORIZONTAL_FORCE = 300.0;
+    // Vertical force for wall jump
+    const WALL_JUMP_VERTICAL_FORCE = -450.0;
 
     // Character frame size in the tilesheet
     const FRAME_WIDTH = 96;
@@ -73,7 +78,7 @@ pub const Player = struct {
             .isJumping = false,
             .state = PlayerState.Idle,
             .texture = texture,
-            // 初始化墙壁滑行相关属性
+            // Initialize wall sliding related properties
             .isWallSliding = false,
             .wallDirection = 0.0,
             .wallSlideTimer = 0.0,
@@ -94,28 +99,28 @@ pub const Player = struct {
     }
 
     pub fn update(self: *Player, dt: f32, platforms: []const Platform) void {
-        // 如果在墙上滑行，更新计时器
+        // If wall sliding, update timer
         if (self.isWallSliding) {
             self.wallSlideTimer += dt;
             if (self.wallSlideTimer >= WALL_SLIDE_MAX_TIME) {
-                // 吸附时间到，不再吸附墙壁
+                // Time's up, stop wall sliding
                 self.isWallSliding = false;
             }
         } else {
             self.wallSlideTimer = 0.0;
         }
 
-        // 检测蹬墙跳输入
+        // Detect wall jump input
         if (self.isWallSliding and rl.isKeyPressed(rl.KeyboardKey.space)) {
-            // 执行蹬墙跳
+            // Execute wall jump
             self.velocity.y = WALL_JUMP_VERTICAL_FORCE;
-            // 从墙壁反向跳跃
+            // Jump from opposite direction
             self.velocity.x = -self.wallDirection * WALL_JUMP_HORIZONTAL_FORCE;
-            // 重置状态
+            // Reset state
             self.isWallSliding = false;
             self.isJumping = true;
             self.state = PlayerState.Jump;
-            // 根据弹跳方向翻转角色
+            // Flip character based on jump direction
             self.isFlipped = self.velocity.x < 0;
         }
 
@@ -129,7 +134,7 @@ pub const Player = struct {
             self.isFlipped = true;
             if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
         } else {
-            // 如果不在墙壁上滑行，重置水平速度
+            // Reset horizontal velocity if not wall sliding
             if (!self.isWallSliding) {
                 self.velocity.x = 0;
             }
@@ -148,15 +153,15 @@ pub const Player = struct {
             self.state = PlayerState.Jump;
         }
 
-        // Apply gravity - 根据是否在墙壁上滑行应用不同的重力
+        // Apply gravity - different gravity when wall sliding
         if (self.isWallSliding) {
             self.velocity.y += WALL_SLIDE_GRAVITY * dt;
         } else {
             self.velocity.y += GRAVITY * dt;
         }
 
-        // 在更新位置前标记当前不在墙上
-        // 如果检测到墙壁碰撞，会在下面的代码中重新设置
+        // Mark as not wall sliding before updating position
+        // Will be reset if wall collision is detected below
         self.isWallSliding = false;
 
         // Save the current position for more precise collision detection
@@ -170,28 +175,28 @@ pub const Player = struct {
             if (self.checkCollision(platform)) {
                 // Use oldPosition to determine collision direction
                 if (oldPosition.x + self.size.x <= platform.position.x) {
-                    // Collision from the left - 右侧墙壁
+                    // Collision from the left - right wall
                     self.position.x = platform.position.x - self.size.x;
 
-                    // 检测是否应该进入墙壁滑行状态
+                    // Check if should enter wall slide state
                     if (self.isJumping and self.velocity.y > 0) {
                         self.isWallSliding = true;
-                        self.wallDirection = 1.0; // 右墙
+                        self.wallDirection = 1.0; // right wall
                         self.state = PlayerState.WallSlide;
                     }
                 } else if (oldPosition.x >= platform.position.x + platform.size.x) {
-                    // Collision from the right - 左侧墙壁
+                    // Collision from the right - left wall
                     self.position.x = platform.position.x + platform.size.x;
 
-                    // 检测是否应该进入墙壁滑行状态
+                    // Check if should enter wall slide state
                     if (self.isJumping and self.velocity.y > 0) {
                         self.isWallSliding = true;
-                        self.wallDirection = -1.0; // 左墙
+                        self.wallDirection = -1.0; // left wall
                         self.state = PlayerState.WallSlide;
                     }
                 }
 
-                // 如果不是墙壁滑行，重置水平速度
+                // Reset horizontal velocity if not wall sliding
                 if (!self.isWallSliding) {
                     self.velocity.x = 0;
                 }
@@ -210,7 +215,7 @@ pub const Player = struct {
                     self.position.y = platform.position.y - self.size.y;
                     self.velocity.y = 0;
                     self.isJumping = false;
-                    self.isWallSliding = false; // 落地时结束墙壁滑行
+                    self.isWallSliding = false; // End wall sliding when landing
                     // Reset state
                     if (self.velocity.x == 0) {
                         self.state = PlayerState.Idle;
@@ -279,7 +284,7 @@ pub const Player = struct {
                 sourceRect = self.frames.happy;
             },
             PlayerState.WallSlide => {
-                // 墙壁滑行状态使用攀爬动画
+                // Use climbing animation for wall slide state
                 sourceRect = self.frames.climb1;
             },
         }
