@@ -48,19 +48,30 @@ pub const Player = struct {
     // For flipping sprite based on direction
     isFlipped: bool,
 
+    // Add fatigue system for wall jumps
+    wallJumpFatigue: f32,
+    wallJumpRecoveryRate: f32,
+
     const MOVE_SPEED = 200.0;
     const JUMP_FORCE = -500.0;
     const GRAVITY = 800.0;
     const FRAME_SPEED = 30;
 
-    // Gravity when wall sliding (less than normal gravity)
+    // Wall jump mechanics constants
     const WALL_SLIDE_GRAVITY = 200.0;
-    // Maximum wall slide time (in seconds)
     const WALL_SLIDE_MAX_TIME = 1.2;
-    // Horizontal force for wall jump
     const WALL_JUMP_HORIZONTAL_FORCE = 300.0;
-    // Vertical force for wall jump
     const WALL_JUMP_VERTICAL_FORCE = -450.0;
+
+    // New constants for jump fatigue system
+    // 25% fatigue increase per wall jump
+    const WALL_JUMP_FATIGUE_INCREASE = 0.25;
+    // Recovery rate when on ground (per second)
+    const WALL_JUMP_FATIGUE_RECOVERY = 0.5;
+    // Max fatigue (80% reduction in jump force)
+    const WALL_JUMP_MAX_FATIGUE = 0.80;
+    // Reduced horizontal control in air after wall jump
+    const AIR_CONTROL_REDUCTION = 0.7;
 
     // Character frame size in the tilesheet
     const FRAME_WIDTH = 96;
@@ -95,50 +106,79 @@ pub const Player = struct {
             },
             .framesCounter = 0,
             .isFlipped = false,
+            .wallJumpFatigue = 0.0,
+            .wallJumpRecoveryRate = WALL_JUMP_FATIGUE_RECOVERY,
         };
     }
 
     pub fn update(self: *Player, dt: f32, platforms: []const Platform) void {
-        // If wall sliding, update timer
+        // Recovery from fatigue when on ground
+        if (!self.isJumping) {
+            self.wallJumpFatigue -= self.wallJumpRecoveryRate * dt;
+            if (self.wallJumpFatigue < 0.0) {
+                self.wallJumpFatigue = 0.0;
+            }
+        }
+
+        // Wall sliding timer logic
         if (self.isWallSliding) {
             self.wallSlideTimer += dt;
             if (self.wallSlideTimer >= WALL_SLIDE_MAX_TIME) {
-                // Time's up, stop wall sliding
                 self.isWallSliding = false;
             }
         } else {
             self.wallSlideTimer = 0.0;
         }
 
-        // Detect wall jump input
+        // Wall jump with fatigue effect
         if (self.isWallSliding and rl.isKeyPressed(rl.KeyboardKey.space)) {
-            // Execute wall jump
-            self.velocity.y = WALL_JUMP_VERTICAL_FORCE;
-            // Jump from opposite direction
-            self.velocity.x = -self.wallDirection * WALL_JUMP_HORIZONTAL_FORCE;
+            // Calculate reduced jump force based on fatigue
+            const fatigueFactor = 1.0 - self.wallJumpFatigue;
+
+            // Apply reduced vertical and horizontal forces
+            self.velocity.y = WALL_JUMP_VERTICAL_FORCE * fatigueFactor;
+            self.velocity.x = -self.wallDirection * WALL_JUMP_HORIZONTAL_FORCE * fatigueFactor;
+
+            // Increase fatigue for next wall jump (capped at max)
+            self.wallJumpFatigue += WALL_JUMP_FATIGUE_INCREASE;
+            if (self.wallJumpFatigue > WALL_JUMP_MAX_FATIGUE) {
+                self.wallJumpFatigue = WALL_JUMP_MAX_FATIGUE;
+            }
+
             // Reset state
             self.isWallSliding = false;
             self.isJumping = true;
             self.state = PlayerState.Jump;
-            // Flip character based on jump direction
             self.isFlipped = self.velocity.x < 0;
         }
 
-        // Determine horizontal movement and update state
-        if (rl.isKeyDown(rl.KeyboardKey.right)) {
-            self.velocity.x = MOVE_SPEED;
-            self.isFlipped = false;
-            if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
-        } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
-            self.velocity.x = -MOVE_SPEED;
-            self.isFlipped = true;
-            if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
-        } else {
-            // Reset horizontal velocity if not wall sliding
-            if (!self.isWallSliding) {
-                self.velocity.x = 0;
+        // Reduced horizontal control after wall jump
+        if (self.isJumping and self.wallJumpFatigue > 0.0) {
+            // Determine horizontal movement with reduced control
+            if (rl.isKeyDown(rl.KeyboardKey.right)) {
+                // Apply reduced horizontal speed based on fatigue
+                self.velocity.x = MOVE_SPEED * (1.0 - self.wallJumpFatigue * AIR_CONTROL_REDUCTION);
+                self.isFlipped = false;
+            } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
+                self.velocity.x = -MOVE_SPEED * (1.0 - self.wallJumpFatigue * AIR_CONTROL_REDUCTION);
+                self.isFlipped = true;
             }
-            if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Idle;
+        } else {
+            // Normal movement controls
+            if (rl.isKeyDown(rl.KeyboardKey.right)) {
+                self.velocity.x = MOVE_SPEED;
+                self.isFlipped = false;
+                if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
+            } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
+                self.velocity.x = -MOVE_SPEED;
+                self.isFlipped = true;
+                if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
+            } else {
+                if (!self.isWallSliding) {
+                    self.velocity.x = 0;
+                }
+                if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Idle;
+            }
         }
 
         // Duck state if down key is pressed and not jumping
