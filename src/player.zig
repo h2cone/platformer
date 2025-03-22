@@ -2,35 +2,22 @@ const std = @import("std");
 const rl = @import("raylib");
 const Platform = @import("platform.zig").Platform;
 
-// Define player states
-pub const PlayerState = enum {
+pub const State = enum {
     Idle,
     Walk,
     Jump,
     Duck,
     Climb,
     Happy,
-    WallSlide,
 };
 
 pub const Player = struct {
     position: rl.Vector2,
     velocity: rl.Vector2,
     size: rl.Vector2,
-    isJumping: bool,
-    state: PlayerState,
-
-    // Wall sliding related properties
-    isWallSliding: bool,
-    // Wall direction, -1.0 for left wall, 1.0 for right wall
-    wallDirection: f32,
-    // Wall slide timer
-    wallSlideTimer: f32,
-
-    // Single texture for all states
+    state: State,
     texture: rl.Texture2D,
-
-    // Frame rectangles for each state
+    // Animation frames
     frames: struct {
         idle: rl.Rectangle,
         walk1: rl.Rectangle,
@@ -41,59 +28,25 @@ pub const Player = struct {
         climb2: rl.Rectangle,
         happy: rl.Rectangle,
     },
-
-    // For walk animation timing
-    framesCounter: i32,
-
-    // For flipping sprite based on direction
+    framesCount: i32,
     isFlipped: bool,
-
-    // Add fatigue system for wall jumps
-    wallJumpFatigue: f32,
-    wallJumpRecoveryRate: f32,
 
     const MOVE_SPEED = 200.0;
     const JUMP_FORCE = -500.0;
     const GRAVITY = 800.0;
-    const FRAME_SPEED = 30;
-
-    // Wall jump mechanics constants
-    const WALL_SLIDE_GRAVITY = 200.0;
-    const WALL_SLIDE_MAX_TIME = 1.2;
-    const WALL_JUMP_HORIZONTAL_FORCE = 300.0;
-    const WALL_JUMP_VERTICAL_FORCE = -450.0;
-
-    // New constants for jump fatigue system
-    // 25% fatigue increase per wall jump
-    const WALL_JUMP_FATIGUE_INCREASE = 0.25;
-    // Recovery rate when on ground (per second)
-    const WALL_JUMP_FATIGUE_RECOVERY = 0.5;
-    // Max fatigue (80% reduction in jump force)
-    const WALL_JUMP_MAX_FATIGUE = 0.80;
-    // Reduced horizontal control in air after wall jump
-    const AIR_CONTROL_REDUCTION = 0.7;
-
-    // Character frame size in the tilesheet
+    const AIR_RESISTANCE = 1;
+    const FRAME_SPEED = 15;
     const FRAME_WIDTH = 96;
     const FRAME_HEIGHT = 96;
 
     pub fn init(initial_position: rl.Vector2) !Player {
-        // Load the tilesheet
         const texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformerPack_character.png");
-
         return Player{
             .position = initial_position,
             .velocity = .{ .x = 0, .y = 0 },
-            // Display size
             .size = .{ .x = 48, .y = 48 },
-            .isJumping = false,
-            .state = PlayerState.Idle,
+            .state = State.Idle,
             .texture = texture,
-            // Initialize wall sliding related properties
-            .isWallSliding = false,
-            .wallDirection = 0.0,
-            .wallSlideTimer = 0.0,
-            // Define frame rectangles for each state
             .frames = .{
                 .idle = rl.Rectangle{ .x = 0, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
                 .jump = rl.Rectangle{ .x = FRAME_WIDTH, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
@@ -104,186 +57,90 @@ pub const Player = struct {
                 .duck = rl.Rectangle{ .x = FRAME_WIDTH * 6, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
                 .happy = rl.Rectangle{ .x = FRAME_WIDTH * 7, .y = 0, .width = FRAME_WIDTH, .height = FRAME_HEIGHT },
             },
-            .framesCounter = 0,
+            .framesCount = 0,
             .isFlipped = false,
-            .wallJumpFatigue = 0.0,
-            .wallJumpRecoveryRate = WALL_JUMP_FATIGUE_RECOVERY,
         };
     }
 
     pub fn update(self: *Player, dt: f32, platforms: []const Platform) void {
-        // Recovery from fatigue when on ground
-        if (!self.isJumping) {
-            self.wallJumpFatigue -= self.wallJumpRecoveryRate * dt;
-            if (self.wallJumpFatigue < 0.0) {
-                self.wallJumpFatigue = 0.0;
-            }
-        }
-
-        // Wall sliding timer logic
-        if (self.isWallSliding) {
-            self.wallSlideTimer += dt;
-            if (self.wallSlideTimer >= WALL_SLIDE_MAX_TIME) {
-                self.isWallSliding = false;
-            }
+        // Movement
+        if (rl.isKeyDown(rl.KeyboardKey.right)) {
+            self.velocity.x = MOVE_SPEED;
+            self.isFlipped = false;
+            if (self.state != State.Jump and self.state != State.Climb) self.state = State.Walk;
+        } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
+            self.velocity.x = -MOVE_SPEED;
+            self.isFlipped = true;
+            if (self.state != State.Jump and self.state != State.Climb) self.state = State.Walk;
         } else {
-            self.wallSlideTimer = 0.0;
-        }
-
-        // Wall jump with fatigue effect
-        if (self.isWallSliding and rl.isKeyPressed(rl.KeyboardKey.space)) {
-            // Calculate reduced jump force based on fatigue
-            const fatigueFactor = 1.0 - self.wallJumpFatigue;
-
-            // Apply reduced vertical and horizontal forces
-            self.velocity.y = WALL_JUMP_VERTICAL_FORCE * fatigueFactor;
-            self.velocity.x = -self.wallDirection * WALL_JUMP_HORIZONTAL_FORCE * fatigueFactor;
-
-            // Increase fatigue for next wall jump (capped at max)
-            self.wallJumpFatigue += WALL_JUMP_FATIGUE_INCREASE;
-            if (self.wallJumpFatigue > WALL_JUMP_MAX_FATIGUE) {
-                self.wallJumpFatigue = WALL_JUMP_MAX_FATIGUE;
-            }
-
-            // Reset state
-            self.isWallSliding = false;
-            self.isJumping = true;
-            self.state = PlayerState.Jump;
-            self.isFlipped = self.velocity.x < 0;
-        }
-
-        // Reduced horizontal control after wall jump
-        if (self.isJumping and self.wallJumpFatigue > 0.0) {
-            // Determine horizontal movement with reduced control
-            if (rl.isKeyDown(rl.KeyboardKey.right)) {
-                // Apply reduced horizontal speed based on fatigue
-                self.velocity.x = MOVE_SPEED * (1.0 - self.wallJumpFatigue * AIR_CONTROL_REDUCTION);
-                self.isFlipped = false;
-            } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
-                self.velocity.x = -MOVE_SPEED * (1.0 - self.wallJumpFatigue * AIR_CONTROL_REDUCTION);
-                self.isFlipped = true;
-            }
-        } else {
-            // Normal movement controls
-            if (rl.isKeyDown(rl.KeyboardKey.right)) {
-                self.velocity.x = MOVE_SPEED;
-                self.isFlipped = false;
-                if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
-            } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
-                self.velocity.x = -MOVE_SPEED;
-                self.isFlipped = true;
-                if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Walk;
+            if (self.state == State.Jump) {
+                self.velocity.x *= AIR_RESISTANCE;
             } else {
-                if (!self.isWallSliding) {
-                    self.velocity.x = 0;
-                }
-                if (!self.isJumping and !self.isWallSliding) self.state = PlayerState.Idle;
+                self.velocity.x = 0;
+                self.state = State.Idle;
             }
         }
-
         // Duck state if down key is pressed and not jumping
-        if (rl.isKeyDown(rl.KeyboardKey.down) and !self.isJumping) {
-            self.state = PlayerState.Duck;
+        if (rl.isKeyDown(rl.KeyboardKey.down) and self.state != State.Jump) {
+            self.state = State.Duck;
         }
-
         // Jump
-        if (rl.isKeyPressed(rl.KeyboardKey.space) and !self.isJumping and !self.isWallSliding) {
+        if (rl.isKeyPressed(rl.KeyboardKey.space) and self.state != State.Jump) {
             self.velocity.y = JUMP_FORCE;
-            self.isJumping = true;
-            self.state = PlayerState.Jump;
+            self.state = State.Jump;
         }
-
-        // Apply gravity - different gravity when wall sliding
-        if (self.isWallSliding) {
-            self.velocity.y += WALL_SLIDE_GRAVITY * dt;
-        } else {
-            self.velocity.y += GRAVITY * dt;
-        }
-
-        // Mark as not wall sliding before updating position
-        // Will be reset if wall collision is detected below
-        self.isWallSliding = false;
-
-        // Save the current position for more precise collision detection
-        const oldPosition = self.position;
-
-        // Update horizontal position first
-        self.position.x += self.velocity.x * dt;
-
-        // Detect horizontal collisions
-        for (platforms) |platform| {
-            if (self.checkCollision(platform)) {
-                // Use oldPosition to determine collision direction
-                if (oldPosition.x + self.size.x <= platform.position.x) {
-                    // Collision from the left - right wall
-                    self.position.x = platform.position.x - self.size.x;
-
-                    // Check if should enter wall slide state
-                    if (self.isJumping and self.velocity.y > 0) {
-                        self.isWallSliding = true;
-                        self.wallDirection = 1.0; // right wall
-                        self.state = PlayerState.WallSlide;
-                    }
-                } else if (oldPosition.x >= platform.position.x + platform.size.x) {
-                    // Collision from the right - left wall
-                    self.position.x = platform.position.x + platform.size.x;
-
-                    // Check if should enter wall slide state
-                    if (self.isJumping and self.velocity.y > 0) {
-                        self.isWallSliding = true;
-                        self.wallDirection = -1.0; // left wall
-                        self.state = PlayerState.WallSlide;
-                    }
-                }
-
-                // Reset horizontal velocity if not wall sliding
-                if (!self.isWallSliding) {
-                    self.velocity.x = 0;
-                }
-            }
-        }
-
-        // Update vertical position
-        self.position.y += self.velocity.y * dt;
-
-        // Detect vertical collisions
-        for (platforms) |platform| {
-            if (self.checkCollision(platform)) {
-                // Use oldPosition to determine collision direction
-                if (oldPosition.y + self.size.y <= platform.position.y) {
-                    // Collision from above
-                    self.position.y = platform.position.y - self.size.y;
-                    self.velocity.y = 0;
-                    self.isJumping = false;
-                    self.isWallSliding = false; // End wall sliding when landing
-                    // Reset state
-                    if (self.velocity.x == 0) {
-                        self.state = PlayerState.Idle;
-                    } else {
-                        self.state = PlayerState.Walk;
-                    }
-                } else if (oldPosition.y >= platform.position.y + platform.size.y) {
-                    // Collision from below
-                    self.position.y = platform.position.y + platform.size.y;
-                    self.velocity.y = 0;
-                }
-            }
-        }
-
+        // Apply gravity
+        self.velocity.y += GRAVITY * dt;
+        // Update position
+        updatePosition(self, dt, platforms);
         // Update walk animation if in Walk state
-        if (self.state == PlayerState.Walk) {
-            self.framesCounter += 1;
-            if (self.framesCounter >= FRAME_SPEED) {
-                // Toggle between walk1 and walk2 by using framesCounter mod 2
-                self.framesCounter = 0;
+        if (self.state == State.Walk) {
+            self.framesCount += 1;
+            if (self.framesCount >= FRAME_SPEED) {
+                self.framesCount = 0;
             }
         } else {
-            // Reset counter for non-walk states if needed
-            self.framesCounter = 0;
+            self.framesCount = 0;
         }
     }
 
-    pub fn checkCollision(self: Player, platform: Platform) bool {
+    fn updatePosition(self: *Player, dt: f32, platforms: []const Platform) void {
+        const oldPosition = self.position;
+        self.position.x += self.velocity.x * dt;
+        // Detect horizontal collisions
+        for (platforms) |platform| {
+            if (self.checkCollision(platform)) {
+                if (oldPosition.x + self.size.x <= platform.position.x) {
+                    self.position.x = platform.position.x - self.size.x;
+                } else if (oldPosition.x >= platform.position.x + platform.size.x) {
+                    self.position.x = platform.position.x + platform.size.x;
+                }
+                self.velocity.x = 0;
+            }
+        }
+        self.position.y += self.velocity.y * dt;
+        // Detect vertical collisions
+        for (platforms) |platform| {
+            if (self.checkCollision(platform)) {
+                if (oldPosition.y + self.size.y <= platform.position.y) {
+                    self.position.y = platform.position.y - self.size.y;
+                    // Reset state when landing
+                    if (self.state == State.Jump) {
+                        if (self.velocity.x == 0) {
+                            self.state = State.Idle;
+                        } else {
+                            self.state = State.Walk;
+                        }
+                    }
+                } else if (oldPosition.y >= platform.position.y + platform.size.y) {
+                    self.position.y = platform.position.y + platform.size.y;
+                }
+                self.velocity.y = 0;
+            }
+        }
+    }
+
+    fn checkCollision(self: Player, platform: Platform) bool {
         return self.position.x < platform.position.x + platform.size.x and
             self.position.x + self.size.x > platform.position.x and
             self.position.y < platform.position.y + platform.size.y and
@@ -292,48 +149,41 @@ pub const Player = struct {
 
     pub fn draw(self: Player) void {
         var sourceRect = self.frames.idle;
-
         // Select source rectangle based on state
         switch (self.state) {
-            PlayerState.Idle => {
+            State.Idle => {
                 sourceRect = self.frames.idle;
             },
-            PlayerState.Walk => {
+            State.Walk => {
                 // Alternate between walk textures
-                if (@rem(self.framesCounter, 2) == 0) {
+                if (@rem(self.framesCount, 2) == 0) {
                     sourceRect = self.frames.walk1;
                 } else {
                     sourceRect = self.frames.walk2;
                 }
             },
-            PlayerState.Jump => {
+            State.Jump => {
                 sourceRect = self.frames.jump;
             },
-            PlayerState.Duck => {
+            State.Duck => {
                 sourceRect = self.frames.duck;
             },
-            PlayerState.Climb => {
+            State.Climb => {
                 // For climb we can alternate between two climb textures
-                if (@rem(self.framesCounter, 2) == 0) {
+                if (@rem(self.framesCount, 2) == 0) {
                     sourceRect = self.frames.climb1;
                 } else {
                     sourceRect = self.frames.climb2;
                 }
             },
-            PlayerState.Happy => {
+            State.Happy => {
                 sourceRect = self.frames.happy;
             },
-            PlayerState.WallSlide => {
-                // Use climbing animation for wall slide state
-                sourceRect = self.frames.climb1;
-            },
         }
-
         // Apply flip if needed
         if (self.isFlipped) {
             sourceRect.width = -sourceRect.width;
         }
-
         // Destination rectangle (where to draw on screen)
         const dest = rl.Rectangle{
             .x = self.position.x,
@@ -341,10 +191,8 @@ pub const Player = struct {
             .width = self.size.x,
             .height = self.size.y,
         };
-
         // Origin (rotation/scale origin point)
         const origin = rl.Vector2{ .x = 0, .y = 0 };
-
         // Draw the texture
         rl.drawTexturePro(self.texture, sourceRect, dest, origin, 0.0, rl.Color.white);
     }
