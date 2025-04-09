@@ -25,9 +25,10 @@ pub const Player = struct {
     },
     framesCount: u8,
     isFlipped: bool,
-
-    wallJumpDirection: i8,
-    wallJumpCountdown: f32,
+    // Direction of wall contact
+    wallDirection: i8,
+    // Time window for wall jump
+    wallJumpWindow: f32,
 
     const MOVE_SPEED = 200.0;
     const JUMP_FORCE = -500.0;
@@ -42,7 +43,9 @@ pub const Player = struct {
 
     const WALL_DETECTION_RANGE = PLAYER_WIDTH / 3;
     const WALL_SLIDE_SPEED = 100.0;
-    const WALL_JUMP_BUFFER_TIME = 0.3;
+    const WALL_JUMP_WINDOW_TIME = 0.5;
+    const WALL_JUMP_FORCE_X = 350.0;
+    const WALL_JUMP_FORCE_Y = -500.0;
 
     pub fn init(initial_position: rl.Vector2) !Player {
         const texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformerPack_character.png");
@@ -61,8 +64,8 @@ pub const Player = struct {
             },
             .framesCount = 0,
             .isFlipped = false,
-            .wallJumpDirection = 0,
-            .wallJumpCountdown = 0,
+            .wallDirection = 0,
+            .wallJumpWindow = 0,
         };
     }
 
@@ -103,8 +106,8 @@ pub const Player = struct {
                 }
             },
             State.Jump => {
-                self.updateWallJumpDirection(platforms);
-                if (self.wallJumpDirection == 0) {
+                self.updateWallDirection(platforms);
+                if (self.wallDirection == 0) {
                     if (rl.isKeyDown(rl.KeyboardKey.right)) {
                         self.velocity.x = MOVE_SPEED;
                         self.isFlipped = false;
@@ -120,20 +123,21 @@ pub const Player = struct {
                 }
             },
             State.Slide => {
-                if (self.velocity.y > 0) {
-                    if (self.wallJumpCountdown > 0) {
-                        self.wallJumpCountdown -= dt;
+                if (self.wallJumpWindow > 0) {
+                    self.wallJumpWindow -= dt;
+                }
+                if (rl.isKeyPressed(rl.KeyboardKey.space)) {
+                    std.debug.print("{} Prepare to wall jump\n", .{std.time.timestamp()});
+                    self.wallJumpWindow = WALL_JUMP_WINDOW_TIME;
+                }
+                if (self.wallJumpWindow > 0) {
+                    if (rl.isKeyPressed(rl.KeyboardKey.right) and self.wallDirection == -1) {
+                        std.debug.print("{} Wall jump to right\n", .{std.time.timestamp()});
+                        self.wallDirection = 0;
+                    } else if (rl.isKeyPressed(rl.KeyboardKey.left) and self.wallDirection == 1) {
+                        std.debug.print("{} Wall jump to left\n", .{std.time.timestamp()});
+                        self.wallDirection = 0;
                     }
-                    if (rl.isKeyPressed(rl.KeyboardKey.space)) {
-                        std.debug.print("{} Prepare to wall jump\n", .{std.time.timestamp()});
-                        self.wallJumpCountdown = WALL_JUMP_BUFFER_TIME;
-                    }
-                    if (self.wallJumpCountdown > 0) {
-                        // TODO Wall jump
-                        self.wallJumpDirection = 0;
-                    }
-                } else {
-                    self.wallJumpDirection = 0;
                 }
             },
         }
@@ -186,7 +190,7 @@ pub const Player = struct {
         }
     }
 
-    fn updateWallJumpDirection(self: *Player, platforms: []Platform) void {
+    fn updateWallDirection(self: *Player, platforms: []Platform) void {
         for (platforms) |platform| {
             // Detect left wall
             if (self.position.x <= platform.position.x + platform.size.x and
@@ -194,7 +198,7 @@ pub const Player = struct {
                 self.position.y + self.size.y > platform.position.y and
                 self.position.y < platform.position.y + platform.size.y)
             {
-                self.wallJumpDirection = 1;
+                self.wallDirection = -1;
                 break;
             }
             // Detect right wall
@@ -203,7 +207,7 @@ pub const Player = struct {
                 self.position.y + self.size.y > platform.position.y and
                 self.position.y < platform.position.y + platform.size.y)
             {
-                self.wallJumpDirection = -1;
+                self.wallDirection = 1;
                 break;
             }
         }
