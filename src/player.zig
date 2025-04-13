@@ -29,9 +29,13 @@ pub const Player = struct {
     wallDirection: i8,
     // Time window for wall jump
     wallJumpWindow: f32,
+    // Direction of wall jump
+    wallJumpDirection: i8,
+    // Whether the wall jump has reached the apex
+    wallJumpReachedApex: bool,
 
     const MOVE_SPEED = 200.0;
-    const JUMP_FORCE = -500.0;
+    const JUMP_FORCE = -450.0;
     const GRAVITY = 1000.0;
 
     const FRAME_SPEED = 15;
@@ -43,9 +47,9 @@ pub const Player = struct {
 
     const WALL_DETECTION_RANGE = PLAYER_WIDTH / 3;
     const WALL_SLIDE_SPEED = 100.0;
-    const WALL_JUMP_WINDOW_TIME = 0.5;
-    const WALL_JUMP_FORCE_X = 350.0;
-    const WALL_JUMP_FORCE_Y = -500.0;
+    const WALL_JUMP_WINDOW_TIME = 0.6;
+    const WALL_JUMP_FORCE_X = 250.0;
+    const WALL_JUMP_FORCE_Y = JUMP_FORCE;
 
     pub fn init(initial_position: rl.Vector2) !Player {
         const texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformerPack_character.png");
@@ -66,6 +70,8 @@ pub const Player = struct {
             .isFlipped = false,
             .wallDirection = 0,
             .wallJumpWindow = 0,
+            .wallJumpDirection = 0,
+            .wallJumpReachedApex = false,
         };
     }
 
@@ -108,35 +114,47 @@ pub const Player = struct {
             State.Jump => {
                 self.updateWallDirection(platforms);
                 if (self.wallDirection == 0) {
-                    if (rl.isKeyDown(rl.KeyboardKey.right)) {
-                        self.velocity.x = MOVE_SPEED;
-                        self.isFlipped = false;
-                    } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
-                        self.velocity.x = -MOVE_SPEED;
-                        self.isFlipped = true;
+                    if (self.wallJumpDirection == 0) {
+                        if (rl.isKeyDown(rl.KeyboardKey.right)) {
+                            self.velocity.x = MOVE_SPEED;
+                            self.isFlipped = false;
+                        } else if (rl.isKeyDown(rl.KeyboardKey.left)) {
+                            self.velocity.x = -MOVE_SPEED;
+                            self.isFlipped = true;
+                        }
+                    } else {
+                        if (rl.isKeyDown(rl.KeyboardKey.right) and self.wallJumpReachedApex) {
+                            self.velocity.x = MOVE_SPEED;
+                            self.isFlipped = false;
+                        } else if (rl.isKeyDown(rl.KeyboardKey.left) and self.wallJumpReachedApex) {
+                            self.velocity.x = -MOVE_SPEED;
+                            self.isFlipped = true;
+                        }
                     }
                 } else {
-                    if (self.velocity.y > WALL_SLIDE_SPEED) {
-                        self.velocity.y = WALL_SLIDE_SPEED;
-                    }
                     self.state = State.Slide;
                 }
             },
             State.Slide => {
+                if (self.velocity.y > WALL_SLIDE_SPEED) {
+                    self.velocity.y = WALL_SLIDE_SPEED;
+                }
                 if (self.wallJumpWindow > 0) {
                     self.wallJumpWindow -= dt;
                 }
                 if (rl.isKeyPressed(rl.KeyboardKey.space)) {
-                    std.debug.print("{} Prepare to wall jump\n", .{std.time.timestamp()});
                     self.wallJumpWindow = WALL_JUMP_WINDOW_TIME;
                 }
                 if (self.wallJumpWindow > 0) {
-                    if (rl.isKeyPressed(rl.KeyboardKey.right) and self.wallDirection == -1) {
-                        std.debug.print("{} Wall jump to right\n", .{std.time.timestamp()});
+                    const wallJumpSucceed = (rl.isKeyPressed(rl.KeyboardKey.right) and self.wallDirection == -1) or (rl.isKeyPressed(rl.KeyboardKey.left) and self.wallDirection == 1);
+                    if (wallJumpSucceed) {
+                        self.velocity.x = WALL_JUMP_FORCE_X * -@as(f32, @floatFromInt(self.wallDirection));
+                        self.velocity.y = WALL_JUMP_FORCE_Y;
+                        self.state = State.Jump;
+                        self.wallJumpDirection = -self.wallDirection;
+                        self.wallJumpReachedApex = false;
                         self.wallDirection = 0;
-                    } else if (rl.isKeyPressed(rl.KeyboardKey.left) and self.wallDirection == 1) {
-                        std.debug.print("{} Wall jump to left\n", .{std.time.timestamp()});
-                        self.wallDirection = 0;
+                        self.isFlipped = self.wallJumpDirection < 0;
                     }
                 }
             },
@@ -171,6 +189,7 @@ pub const Player = struct {
                         } else {
                             self.state = State.Walk;
                         }
+                        self.resetWallState();
                     }
                 } else if (oldPosition.y >= platform.position.y + platform.size.y) {
                     // Player is on bottom of the platform
@@ -178,6 +197,10 @@ pub const Player = struct {
                 }
                 self.velocity.y = 0;
             }
+        }
+        // Detect if the wall jump has reached the apex
+        if (self.wallJumpDirection != 0 and self.velocity.y >= 0) {
+            self.wallJumpReachedApex = true;
         }
         // Update walk animation if in Walk state
         if (self.state == State.Walk) {
@@ -188,6 +211,13 @@ pub const Player = struct {
         } else {
             self.framesCount = 0;
         }
+    }
+
+    fn resetWallState(self: *Player) void {
+        self.wallDirection = 0;
+        self.wallJumpWindow = 0;
+        self.wallJumpDirection = 0;
+        self.wallJumpReachedApex = false;
     }
 
     fn updateWallDirection(self: *Player, platforms: []Platform) void {
