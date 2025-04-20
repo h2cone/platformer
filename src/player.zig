@@ -35,21 +35,21 @@ pub const Player = struct {
     wallJumpReachedApex: bool,
 
     const MOVE_SPEED = 200.0;
-    const JUMP_FORCE = -450.0;
+    const JUMP_FORCE = -500.0;
     const GRAVITY = 1000.0;
 
     const FRAME_SPEED = 15;
     const FRAME_WIDTH = 96;
     const FRAME_HEIGHT = 96;
 
-    const PLAYER_WIDTH = 48;
-    const PLAYER_HEIGHT = 48;
+    pub const PLAYER_WIDTH = 64;
+    pub const PLAYER_HEIGHT = 64;
 
-    const WALL_DETECTION_RANGE = PLAYER_WIDTH / 3;
+    const WALL_DETECTION_RANGE = PLAYER_WIDTH / 4;
     const WALL_SLIDE_SPEED = 100.0;
     const WALL_JUMP_WINDOW_TIME = 0.6;
     const WALL_JUMP_FORCE_X = 250.0;
-    const WALL_JUMP_FORCE_Y = JUMP_FORCE;
+    const WALL_JUMP_FORCE_Y = -450.0;
 
     pub fn init(initial_position: rl.Vector2) !Player {
         const texture = try rl.loadTexture("./assets/kenney_simplified-platformer-pack/Tilesheet/platformerPack_character.png");
@@ -136,25 +136,31 @@ pub const Player = struct {
                 }
             },
             State.Slide => {
-                if (self.velocity.y > WALL_SLIDE_SPEED) {
-                    self.velocity.y = WALL_SLIDE_SPEED;
-                }
-                if (self.wallJumpWindow > 0) {
-                    self.wallJumpWindow -= dt;
-                }
-                if (rl.isKeyPressed(rl.KeyboardKey.space)) {
-                    self.wallJumpWindow = WALL_JUMP_WINDOW_TIME;
-                }
-                if (self.wallJumpWindow > 0) {
-                    const wallJumpSucceed = (rl.isKeyPressed(rl.KeyboardKey.right) and self.wallDirection == -1) or (rl.isKeyPressed(rl.KeyboardKey.left) and self.wallDirection == 1);
-                    if (wallJumpSucceed) {
-                        self.velocity.x = WALL_JUMP_FORCE_X * -@as(f32, @floatFromInt(self.wallDirection));
-                        self.velocity.y = WALL_JUMP_FORCE_Y;
-                        self.state = State.Jump;
-                        self.wallJumpDirection = -self.wallDirection;
-                        self.wallJumpReachedApex = false;
-                        self.wallDirection = 0;
-                        self.isFlipped = self.wallJumpDirection < 0;
+                self.updateWallDirection(platforms);
+                if (self.wallDirection == 0) {
+                    self.resetWallState();
+                    self.state = State.Jump;
+                } else {
+                    if (self.velocity.y > WALL_SLIDE_SPEED) {
+                        self.velocity.y = WALL_SLIDE_SPEED;
+                    }
+                    if (self.wallJumpWindow > 0) {
+                        self.wallJumpWindow -= dt;
+                    }
+                    if (rl.isKeyPressed(rl.KeyboardKey.space)) {
+                        self.wallJumpWindow = WALL_JUMP_WINDOW_TIME;
+                    }
+                    if (self.wallJumpWindow > 0) {
+                        const wallJumpSucceed = (rl.isKeyPressed(rl.KeyboardKey.right) and self.wallDirection == -1) or (rl.isKeyPressed(rl.KeyboardKey.left) and self.wallDirection == 1);
+                        if (wallJumpSucceed) {
+                            self.velocity.x = WALL_JUMP_FORCE_X * -@as(f32, @floatFromInt(self.wallDirection));
+                            self.velocity.y = WALL_JUMP_FORCE_Y;
+                            self.state = State.Jump;
+                            self.wallJumpDirection = -self.wallDirection;
+                            self.wallJumpReachedApex = false;
+                            self.wallDirection = 0;
+                            self.isFlipped = self.wallJumpDirection < 0;
+                        }
                     }
                 }
             },
@@ -221,6 +227,11 @@ pub const Player = struct {
     }
 
     fn updateWallDirection(self: *Player, platforms: []Platform) void {
+        self.wallDirection = 0;
+        if (self.velocity.y < 0) {
+            return;
+        }
+        // TODO RayCollision
         for (platforms) |platform| {
             // Detect left wall
             if (self.position.x <= platform.position.x + platform.size.x and

@@ -40,9 +40,9 @@ pub const Game = struct {
         // Calculate initial player position - place above the center of the found platform
         // Place in the middle of the platform, not at the edge
         const init_player_pos = rl.Vector2{
-            .x = platforms[start_platform_index].position.x + (Platform.TILE_SIZE / 2) - 24.0,
+            .x = platforms[start_platform_index].position.x + (Platform.TILE_SIZE / 2) - Player.PLAYER_WIDTH / 2,
             // Ensure player stands on top of the platform
-            .y = platforms[start_platform_index].position.y - 48.0,
+            .y = platforms[start_platform_index].position.y - Player.PLAYER_HEIGHT,
         };
 
         const player = try Player.init(init_player_pos);
